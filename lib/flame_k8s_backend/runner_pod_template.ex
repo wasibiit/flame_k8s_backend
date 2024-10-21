@@ -151,25 +151,24 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
 
   alias FLAMEK8sBackend.RunnerPodTemplate
 
-  defstruct [:env, :resources, add_parent_env: true]
+  defstruct [:env, :resources, :volume_mounts, :volumes, add_parent_env: true]
 
   @typedoc """
   Describing the Runner Pod Template struct
 
-  ### Fields
+  ### Fields
 
   * `env` - a map describing a Pod environment variable declaration
-    `%{"name" => "MY_ENV_VAR", "value" => "my_env_var_value"}`
-
   * `resources` - Pod resource requests and limits.
-
-  * `add_parent_env` - If true, all env vars of the main container
-    including `envFrom` are copied to the runner pod.
-    default: `true`
+  * `volume_mounts` - List of volume mounts for the container.
+  * `volumes` - List of volumes to be included in the pod spec.
+  * `add_parent_env` - If true, all env vars of the main container including `envFrom` are copied to the runner pod.
   """
   @type t :: %__MODULE__{
           env: map() | nil,
           resources: map() | nil,
+          volume_mounts: list() | nil,
+          volumes: list() | nil,
           add_parent_env: boolean()
         }
   @type parent_pod_manifest :: map()
@@ -199,6 +198,8 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
   def manifest(parent_pod_manifest, %RunnerPodTemplate{} = template_opts, parent_ref, opts) do
     app_container = app_container(parent_pod_manifest, opts)
     env = template_opts.env || []
+    volume_mounts = template_opts.volume_mounts || []
+    volumes = template_opts.volumes || []
 
     parent_env = if template_opts.add_parent_env, do: app_container["env"]
     parent_env_from = if template_opts.add_parent_env, do: app_container["envFrom"]
@@ -212,9 +213,11 @@ defmodule FLAMEK8sBackend.RunnerPodTemplate do
           %{
             "resources" => template_opts.resources || app_container["resources"],
             "env" => env ++ List.wrap(parent_env),
-            "envFrom" => List.wrap(parent_env_from)
+            "envFrom" => List.wrap(parent_env_from),
+            "volumeMounts" => volume_mounts
           }
-        ]
+        ],
+        "volumes" => volumes
       }
     }
 
